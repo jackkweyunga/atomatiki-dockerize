@@ -1,0 +1,52 @@
+
+# docker-compose file template for running a django image in ngnix using gunicorm
+
+#### variables
+
+# _envfile --> environment variable file
+# _appname --> name of the django app or service
+# _port --> exposed port
+
+
+# compose version
+version: '3.8'
+
+# services
+services:
+
+  # django api service
+  _appname-app:
+    image: _username/_appname
+    restart: unless-stopped
+    volumes:
+      - static_volume:/home/app/src/staticfiles
+      - media_volume:/home/app/src/mediafiles
+    expose:
+      - 8000
+
+  # nginx webserver service
+  _appname-ngnix:
+    build: ./nginx
+    restart: unless-stopped
+    volumes:
+      - static_volume:/home/app/src/staticfiles
+      - media_volume:/home/app/src/mediafiles
+    ports:
+      - _port:80
+    depends_on:
+      - _appname-app
+
+# the volumes
+volumes:
+  static_volume:
+    name: _appname-static_volume
+  media_volume: 
+    name: _appname-media_volume
+
+# our default network
+networks:
+  default:
+    external:
+      name: npm
+
+# jek

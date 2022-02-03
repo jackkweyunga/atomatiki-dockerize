@@ -1,0 +1,17 @@
+config:
+
+  template:
+    type: django
+    remotename: "localname"
+    localname: "remotename"
+    port: 89
+
+  docker:
+    ghkey: "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"
+    sshport: "22"
+    sshhost: "example.com"
+    sshusername: "user"
+    dockerpassword: "password"
+    dockerusername: "username"
+    sshkey: "path/to/keyfile.txt"
+

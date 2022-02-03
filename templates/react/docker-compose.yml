@@ -1,0 +1,12 @@
+version: "3.8"
+
+
+# variables _port
+
+
+services:
+  _appname-app:
+    container_name: _appname-app
+    image: _username/_appname-app
+    ports:
+      - _port:80

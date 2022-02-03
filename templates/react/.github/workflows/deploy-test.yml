@@ -1,0 +1,73 @@
+name: Docker Image CI publish and deploy a test.
+
+
+# variables
+# develop --> the watched brach
+# test-_appname --> the name of the project
+
+on:
+  push:
+    branches:
+      - "develop"
+  pull_request:
+    branches:
+      - "develop"
+
+jobs:
+
+  build-publish-deploy:
+    name: build and push docker
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: checkout to develop
+      uses: actions/checkout@v2
+      with:
+        ref: develop
+
+    - name: Build
+      run: |
+        chmod +x build.sh
+        ./build.sh test
+
+    - name: push Image
+      run: |
+        sudo docker images
+        sudo docker login --username ${{ secrets.DOCKER_USERNAME }} --password ${{ secrets.DOCKER_PASSWORD }}
+        sudo docker push ${{ secrets.DOCKER_USERNAME }}/test-_appname:latest
+
+    - name: ssh to create project folder
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          [ -d "test-_appname" ] && echo exists || mkdir test-_appname
+                    
+    - name: copy required files to server
+      uses: burnett01/rsync-deployments@5.1
+      with:
+        switches: -avzr --delete
+        path: ./test-_appname/
+        remote_path: /home/${{ secrets.SSH_USERNAME }}/test-_appname/
+        remote_host: ${{ secrets.SSH_HOST }}
+        remote_user: ${{ secrets.SSH_USERNAME }}
+        remote_key: ${{ secrets.SSH_KEY }}
+        
+    - name: ssh to deploy project
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          cd test-_appname
+          sudo docker login --username ${{ secrets.DOCKER_USERNAME }} --password ${{ secrets.DOCKER_PASSWORD }}
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          export DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}
+          chmod +x run.sh
+          ./run.sh --server
+

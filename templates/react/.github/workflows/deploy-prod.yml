@@ -1,0 +1,73 @@
+name: Docker Image CI publish and deploy a test.
+
+
+# variables
+# main --> the watched brach
+# _appname --> the name of the project
+
+on:
+  release:
+    type: 
+      - "released"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+
+  build-publish-deploy:
+    name: build and push docker
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: checkout to main
+      uses: actions/checkout@v2
+      with:
+        ref: main
+
+    - name: Build
+      run: |
+        chmod +x build.sh
+        ./build.sh prod
+
+    - name: push Image
+      run: |
+        sudo docker images
+        sudo docker login --username ${{ secrets.DOCKER_USERNAME }} --password ${{ secrets.DOCKER_PASSWORD }}
+        sudo docker push ${{ secrets.DOCKER_USERNAME }}/_appname:latest
+
+    - name: ssh to create project folder
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          [ -d "_appname" ] && echo exists || mkdir _appname
+                    
+    - name: copy required files to server
+      uses: burnett01/rsync-deployments@5.1
+      with:
+        switches: -avzr --delete
+        path: ./_appname/
+        remote_path: /home/${{ secrets.SSH_USERNAME }}/_appname/
+        remote_host: ${{ secrets.SSH_HOST }}
+        remote_user: ${{ secrets.SSH_USERNAME }}
+        remote_key: ${{ secrets.SSH_KEY }}
+        
+    - name: ssh to deploy project
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT }}
+        script: |
+          cd _appname
+          sudo docker login --username ${{ secrets.DOCKER_USERNAME }} --password ${{ secrets.DOCKER_PASSWORD }}
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          export DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}
+          chmod +x run.sh
+          ./run.sh --server
+
